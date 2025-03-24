@@ -24,7 +24,7 @@ library(gplots)    # For heatmap.2 function
 library(pheatmap)  # For enhanced heatmap plotting
 
 # Set working directory to where your CEL files are stored
-setwd("/Users/maulana/Documents/Analysis")  # Replace with your file directory
+setwd("/your/directory/of/files")  # Replace with your file directory
 
 # List and read CEL files (the pattern matches .CEL.gz files)
 cel_files <- list.files(pattern = "\\.CEL\\.gz$")
@@ -41,7 +41,7 @@ top_genes <- names(sort(variability, decreasing = TRUE))[1:40]
 exprs_top <- exprs_mat[top_genes, ]
 
 # Define sample conditions: first 3 controls, next 3 exposed.
-sample_conditions <- factor(c(rep("Healthy", 3), rep("Diabetes", 3)))
+sample_conditions <- factor(c(rep("Control", 3), rep("Diesased", 3)))
 names(sample_conditions) <- colnames(exprs_top)
 
 # Load the RColorBrewer package
