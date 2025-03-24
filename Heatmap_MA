@@ -1,0 +1,98 @@
+# Install required Bioconductor packages if needed:
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+# Install the gplots package if it's not already installed
+if (!requireNamespace("gplots", quietly = TRUE))
+  install.packages("gplots")
+
+# Install RColorBrewer if not already installed
+if (!requireNamespace("RColorBrewer", quietly = TRUE))
+  install.packages("RColorBrewer")
+
+# Install pheatmap if not already installed
+if (!requireNamespace("pheatmap", quietly = TRUE))
+  install.packages("pheatmap")
+
+BiocManager::install(c("affy", "gplots", "pheatmap"))
+# Install the 'affy' package from Bioconductor if needed
+BiocManager::install("affy")
+
+# Load libraries
+library(affy)      # For microarray data processing
+library(gplots)    # For heatmap.2 function
+library(pheatmap)  # For enhanced heatmap plotting
+
+# Set working directory to where your CEL files are stored
+setwd("/Users/maulana/Documents/Analysis")  # Replace with your file directory
+
+# List and read CEL files (the pattern matches .CEL.gz files)
+cel_files <- list.files(pattern = "\\.CEL\\.gz$")
+rawData <- ReadAffy(filenames = cel_files)
+
+# Normalize the data using RMA (Robust Multi-array Average)
+eset <- rma(rawData)
+exprs_mat <- exprs(eset)
+
+# Optionally, to focus on the most informative genes,
+# select the top 40 most variable genes
+variability <- apply(exprs_mat, 1, sd)
+top_genes <- names(sort(variability, decreasing = TRUE))[1:40]
+exprs_top <- exprs_mat[top_genes, ]
+
+# Define sample conditions: first 3 controls, next 3 exposed.
+sample_conditions <- factor(c(rep("Healthy", 3), rep("Diabetes", 3)))
+names(sample_conditions) <- colnames(exprs_top)
+
+# Load the RColorBrewer package
+library(RColorBrewer)
+
+# Now, the brewer.pal function should be available for use
+palette <- brewer.pal(9, "RdBu")
+
+# Method 1: Using heatmap.2 from the gplots package
+# Reset the graphics device and set smaller margins
+dev.off()  # Close any open graphics device if necessary
+par(mar = c(4, 4, 2, 1))  # Adjust margins: bottom, left, top, right
+
+heatmap.2(exprs_top,
+          scale = "row",          # Normalize rows for visualization
+          trace = "none",
+          dendrogram = "none",
+          col = colorRampPalette(rev(brewer.pal(9, "RdBu")))(255),
+          margins = c(10,12),
+          cexCol = 0.7,    # Adjusts font size for sample names (columns)
+          main = "Heatmap of Top 20 Variable Genes")
+
+?heatmap.2
+
+
+# Method 2: Using pheatmap with sample annotations
+annotation_col <- data.frame(Condition = sample_conditions)
+rownames(annotation_col) <- colnames(exprs_top)
+
+# Define custom colors for each condition
+annotation_colors <- list(Condition = c(Control = "blue", Exposed = "red"))
+
+png("heatmap.png", width = 1200, height = 3000)
+pheatmap(exprs_top,
+         scale = "row",
+         color = colorRampPalette(brewer.pal(9, "YlOrRd"))(255),
+         annotation_col = annotation_col,
+         annotation_colors = annotation_colors,
+         clustering_distance_rows = "euclidean",
+         clustering_distance_cols = "euclidean",
+         clustering_method = "complete",
+         cellwidth = 30,   # Modify as needed for appropriate cell width
+         cellheight = 4,  # Modify as needed for cell height
+         fontsize_row = 6,
+         fontsize_col = 6,
+         border_color = NA, 
+         main = "Heatmap with Sample Annotation",
+         )
+display.brewer.all()
+?pheatmap
+
+# Reset the graphics device and set smaller margins
+dev.off()  # Close any open graphics device if necessary
+par(mar = c(4, 4, 2, 1))  # Adjust margins: bottom, left, top, right
