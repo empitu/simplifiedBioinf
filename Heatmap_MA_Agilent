@@ -1,0 +1,43 @@
+# Load the limma package for microarray analysis
+library(limma)
+
+# Read the microarray data from a text file.
+# Adjust the file path, separator, and header as necessary.
+data <- read.delim("path/to/your/data.txt", header = TRUE, sep = "\t", stringsAsFactors = FALSE)
+
+# Inspect the data structure (e.g., gene identifiers, signal intensities)
+head(data)
+
+# Create an expression matrix.
+# Here we assume that the file contains signal intensity columns named "Control1", "Control2", "Diseased1", and "Diseased2".
+exprs <- as.matrix(data[, c("Control1", "Control2", "Diseased1", "Diseased2")])
+
+# If your data are not already in log2-scale, perform the transformation:
+# exprs <- log2(exprs)
+
+# Normalize the expression data between arrays (e.g., using quantile normalization)
+exprs_norm <- normalizeBetweenArrays(exprs, method = "quantile")
+
+# Define the experimental groups:
+# Two controls and two diseased samples.
+group <- factor(c("Control", "Control", "Diseased", "Diseased"))
+
+# Create a design matrix without an intercept (each column corresponds to a group)
+design <- model.matrix(~0 + group)
+colnames(design) <- levels(group)
+print(design)
+
+# Fit a linear model to the normalized expression data
+fit <- lmFit(exprs_norm, design)
+
+# Define a contrast to compare Diseased vs Control
+contrast.matrix <- makeContrasts(Diseased_vs_Control = Diseased - Control, levels = design)
+fit2 <- contrasts.fit(fit, contrast.matrix)
+fit2 <- eBayes(fit2)
+
+# Retrieve the top differentially expressed genes
+results <- topTable(fit2, adjust.method = "BH", number = Inf)
+print(results)
+
+# Optionally, save the differential expression results to a text file for further inspection
+write.table(results, file = "differential_expression_results.txt", sep = "\t", quote = FALSE, row.names = TRUE)
