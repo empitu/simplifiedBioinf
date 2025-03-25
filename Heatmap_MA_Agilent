@@ -1,43 +1,46 @@
-# Load the limma package for microarray analysis
-library(limma)
+# Load required library for heatmap visualization
+library(pheatmap)
 
-# Read the microarray data from a text file.
-# Adjust the file path, separator, and header as necessary.
-data <- read.delim("path/to/your/data.txt", header = TRUE, sep = "\t", stringsAsFactors = FALSE)
+# Set your working directory to the folder containing your txt files
+setwd("path/to/your/txt/files")
 
-# Inspect the data structure (e.g., gene identifiers, signal intensities)
-head(data)
+# List all .txt files in the directory
+files <- list.files(pattern = "\\.txt$")
 
-# Create an expression matrix.
-# Here we assume that the file contains signal intensity columns named "Control1", "Control2", "Diseased1", and "Diseased2".
-exprs <- as.matrix(data[, c("Control1", "Control2", "Diseased1", "Diseased2")])
+# Read each file into a list; each file is assumed to have at least "ID_REF" and "VALUE" columns
+data_list <- lapply(files, function(file) {
+  read.delim(file, header = TRUE, stringsAsFactors = FALSE)
+})
 
-# If your data are not already in log2-scale, perform the transformation:
-# exprs <- log2(exprs)
+# Extract the expression values (using the 'VALUE' column) for each sample,
+# and use the gene IDs (from the 'ID_REF' column) as names
+expr_list <- lapply(data_list, function(df) {
+  setNames(df$VALUE, df$ID_REF)
+})
 
-# Normalize the expression data between arrays (e.g., using quantile normalization)
-exprs_norm <- normalizeBetweenArrays(exprs, method = "quantile")
+# Combine the individual sample vectors into a matrix (assuming gene order is consistent)
+exprs <- do.call(cbind, expr_list)
+colnames(exprs) <- files  # Label columns with file names
 
-# Define the experimental groups:
-# Two controls and two diseased samples.
-group <- factor(c("Control", "Control", "Diseased", "Diseased"))
+# If data are not log-transformed, apply log2 transformation (adding a small offset to avoid log(0))
+exprs_log <- log2(exprs + 1)
 
-# Create a design matrix without an intercept (each column corresponds to a group)
-design <- model.matrix(~0 + group)
-colnames(design) <- levels(group)
-print(design)
+# Define sample groups manually – ensure the order matches the file order.
+# Here we assume that the first two files are controls and the next two are exposed.
+sample_group <- factor(c("Control", "Control", "Exposed", "Exposed"))
+annotation_col <- data.frame(Group = sample_group)
+rownames(annotation_col) <- colnames(exprs_log)
 
-# Fit a linear model to the normalized expression data
-fit <- lmFit(exprs_norm, design)
+# Optionally, select the top 100 most variable genes to improve visualization
+gene_variances <- apply(exprs_log, 1, var)
+top_genes <- names(sort(gene_variances, decreasing = TRUE))[1:100]
+exprs_top <- exprs_log[top_genes, ]
 
-# Define a contrast to compare Diseased vs Control
-contrast.matrix <- makeContrasts(Diseased_vs_Control = Diseased - Control, levels = design)
-fit2 <- contrasts.fit(fit, contrast.matrix)
-fit2 <- eBayes(fit2)
+# Generate the heatmap, scaling rows to highlight relative expression differences
+pheatmap(exprs_top, 
+         annotation_col = annotation_col, 
+         scale = "row", 
+         clustering_distance_rows = "euclidean",
+         clustering_distance_cols = "euclidean",
+         main = "Heatmap of Top 100 Variable Genes")
 
-# Retrieve the top differentially expressed genes
-results <- topTable(fit2, adjust.method = "BH", number = Inf)
-print(results)
-
-# Optionally, save the differential expression results to a text file for further inspection
-write.table(results, file = "differential_expression_results.txt", sep = "\t", quote = FALSE, row.names = TRUE)
